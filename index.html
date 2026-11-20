@@ -71,10 +71,30 @@ function clampViewport(wrap,key){let st=viewportState[key],canvas=wrap.querySele
 function applyViewport(wrap,key){let st=viewportState[key]||{scale:1,x:0,y:0};clampViewport(wrap,key);let canvas=wrap.querySelector('.plan-canvas'),read=wrap.querySelector('.zoom-readout');if(canvas)canvas.style.transform=`translate(${st.x}px,${st.y}px) scale(${st.scale})`;wrap.style.setProperty('--marker-counter-scale',String(1/st.scale));if(read)read.textContent=Math.round(st.scale*100)+'%';wrap.classList.toggle('zoom-active',st.scale>1.01);wrap.classList.toggle('marker-labels-visible',st.scale>=1.7);wrap.classList.toggle('is-placing',adding);wrap.classList.toggle('is-deleting',deleting)}
 function initPlanViewport(wrap,key){if(!viewportState[key])viewportState[key]={scale:1,x:0,y:0};applyViewport(wrap,key);wrap.querySelectorAll('[data-zoom]').forEach(btn=>btn.onclick=()=>{let st=viewportState[key];if(btn.dataset.zoom==='reset'){st.scale=1;st.x=0;st.y=0}else{let next=st.scale*(btn.dataset.zoom==='in'?1.35:1/1.35);st.scale=Math.max(1,Math.min(5,next));if(st.scale===1){st.x=0;st.y=0}}applyViewport(wrap,key)});
  if(wrap.dataset.viewportBound===key)return;wrap.dataset.viewportBound=key;
+ // Keep the zoom centre anchored when the phone rotates or the viewport changes size.
+ if(wrap.dataset.viewportResizeBound!==key){
+  wrap.dataset.viewportResizeBound=key;
+  let previousRect=wrap.getBoundingClientRect();
+  let previousLeft=wrap.querySelector('.plan-canvas')?.offsetLeft||0,previousTop=wrap.querySelector('.plan-canvas')?.offsetTop||0;
+  const reflowViewport=()=>{
+   const nextRect=wrap.getBoundingClientRect(),st=viewportState[key],cv=wrap.querySelector('.plan-canvas');
+   if(!cv){previousRect=nextRect;return;}
+   if(st.scale>1.001&&previousRect.width>0&&previousRect.height>0){
+    const contentX=(previousRect.width/2-previousLeft-st.x)/st.scale;
+    const contentY=(previousRect.height/2-previousTop-st.y)/st.scale;
+    st.x=nextRect.width/2-(cv.offsetLeft||0)-contentX*st.scale;
+    st.y=nextRect.height/2-(cv.offsetTop||0)-contentY*st.scale;
+   }
+   previousRect=nextRect;previousLeft=cv.offsetLeft||0;previousTop=cv.offsetTop||0;
+   applyViewport(wrap,key);
+  };
+  window.addEventListener('resize',reflowViewport,{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(reflowViewport,180),{passive:true});
+ }
  let pts=new Map(),pan=null,pinch=null;const canvas=()=>wrap.querySelector('.plan-canvas');
  wrap.addEventListener('pointerdown',e=>{if(e.target.closest('.marker')||e.target.closest('.plan-zoom'))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pts.size===2){let a=[...pts.values()],rect=wrap.getBoundingClientRect(),midX=(a[0].x+a[1].x)/2-rect.left,midY=(a[0].y+a[1].y)/2-rect.top,st=viewportState[key];pinch={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale:st.scale,midX,midY,tx:st.x,ty:st.y};pan=null;wrap.classList.add('zoom-active')}else if(pts.size===1&&!adding){pan={id:e.pointerId,x:e.clientX,y:e.clientY,tx:viewportState[key].x,ty:viewportState[key].y,moved:false}}});
  wrap.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});let st=viewportState[key];if(pts.size>=2&&pinch){let a=[...pts.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),rect=wrap.getBoundingClientRect(),midX=(a[0].x+a[1].x)/2-rect.left,midY=(a[0].y+a[1].y)/2-rect.top;st.scale=Math.max(1,Math.min(5,pinch.scale*d/Math.max(1,pinch.distance)));if(st.scale===1){st.x=0;st.y=0}else{let contentX=(pinch.midX-pinch.tx)/pinch.scale,contentY=(pinch.midY-pinch.ty)/pinch.scale;st.x=midX-contentX*st.scale;st.y=midY-contentY*st.scale}applyViewport(wrap,key);e.preventDefault()}else if(pan&&pan.id===e.pointerId){let dx=e.clientX-pan.x,dy=e.clientY-pan.y;if(Math.abs(dx)+Math.abs(dy)>5)pan.moved=true;if(pan.moved){st.x=pan.tx+dx;st.y=pan.ty+dy;applyViewport(wrap,key);e.preventDefault()}}});
- const end=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(pan&&pan.id===e.pointerId){if(pan.moved){wrap.dataset.panned='1';setTimeout(()=>delete wrap.dataset.panned,80)}pan=null}};wrap.addEventListener('pointerup',end);wrap.addEventListener('pointercancel',end);
+ const end=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(pan&&pan.id===e.pointerId){if(pan.moved){wrap.dataset.panned='1';setTimeout(()=>delete wrap.dataset.panned,80)}pan=null}};wrap.addEventListener('pointerup',end);wrap.addEventListener('pointercancel',end);wrap.addEventListener('lostpointercapture',end);
  wrap.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();let st=viewportState[key];st.scale=Math.max(1,Math.min(5,st.scale*(e.deltaY<0?1.12:.89)));applyViewport(wrap,key)},{passive:false});
 }
 function bindPlanPlacement(wrap){wrap.onclick=e=>{if(e.target.closest('.marker')||e.target.closest('.plan-zoom'))return;if(wrap.dataset.panned==='1')return;if(!adding||deleting)return;let img=wrap.querySelector('img');if(!img)return;let r=img.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;if(x>=0&&x<=1&&y>=0&&y<=1){e.preventDefault();addLight(x,y)}}}
