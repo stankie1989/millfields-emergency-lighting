@@ -1,4 +1,4 @@
-const CACHE = 'millfields-emergency-lighting-v13';
+const CACHE = 'millfields-emergency-lighting-v17';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', event => {
