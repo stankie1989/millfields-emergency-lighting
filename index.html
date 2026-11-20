@@ -21,12 +21,10 @@
 <nav class="tabbar" aria-label="Application sections">
 <button class="tabbtn active" data-tab="buildings">Buildings & floor plans</button>
 <button class="tabbtn" data-tab="map">Map view</button>
-<button class="tabbtn" data-tab="people">People</button>
-<button class="tabbtn" data-tab="types">Emergency light types</button>
 <button class="tabbtn" data-tab="admin">Admin</button>
 </nav>
 <div class="tabpage active" id="buildingsPage">
-<div class="layout"><aside class="panel side"><div class="section-title">Building management</div><div id="buildingList"></div><button style="width:100%;margin-bottom:8px" id="sideAddBuildingBtn">＋ Add building</button><button class="secondary" style="width:100%" id="addFloorBtn">＋ Add floor to selected building</button><div class="notice">Data is currently saved in this browser on this device. It is not yet synchronised between users or backed up online.</div><div style="margin-top:18px"><div class="section-title">Quick guide</div><div class="muted" style="font-size:13px">1. Add a building and floor plan.<br>2. Choose “Add light”, then tap the plan.<br>3. Select a marker to record an inspection or fault.<br>4. Export your register as a CSV spreadsheet.</div></div></aside>
+<div class="layout">
 <main class="main"><div class="stats"><div class="panel stat"><div class="num" id="totalStat">0</div><div class="lbl">Total lights</div></div><div class="panel stat"><div class="num" id="workingStat">0</div><div class="lbl">Working</div></div><div class="panel stat"><div class="num" id="faultStat">0</div><div class="lbl">Faults</div></div><div class="panel stat"><div class="num" id="uncheckedStat">0</div><div class="lbl">Not inspected</div></div></div>
 <section class="panel workspace"><div class="workspace-head"><div><h2 id="planTitle">Select a building</h2><p id="planSubtitle">Upload a floor plan to get started.</p><div class="floor-list" id="floorList"></div></div><div class="toolbar"><button id="addLightBtn" disabled>＋ Add multiple lights</button><button id="finishAddingBtn" class="secondary" hidden>Finish placing</button><button id="deleteModeBtn" class="danger" type="button">Delete lights</button><button id="finishDeleteBtn" class="danger" type="button" hidden>Delete selected (0)</button><button id="cancelDeleteBtn" class="secondary" type="button" hidden>Cancel</button><button id="removeFloorBtn" class="danger" disabled>Remove floor</button></div></div>
 <div class="plan-wrap" id="planWrap"><div class="plan-placeholder"><div class="big">⌖</div><b>No floor plan uploaded</b><p>Upload a JPG, PNG or WebP image of your floor plan.</p></div></div>
@@ -38,26 +36,36 @@
 <section class="tabpage panel map-fullscreen" id="mapPage"><h2 style="margin:0 0 4px">Floor plan map</h2><p class="muted" style="margin:0">Tap a marker to view its details. Press and hold a marker, then drag it to adjust its position.</p><div class="map-controls"><select id="mapBuildingSelect" aria-label="Select building" style="padding:9px;border:1px solid var(--line);border-radius:8px;min-width:180px"></select><select id="mapFloorSelect" aria-label="Select floor" style="padding:9px;border:1px solid var(--line);border-radius:8px;min-width:160px"></select><button id="mapAddLightsBtn" type="button">＋ Add multiple lights</button><button id="mapFinishAddingBtn" type="button" class="secondary" hidden>Finish placing</button><button id="mapDeleteModeBtn" type="button" class="danger">Delete lights</button><button id="mapFinishDeleteBtn" type="button" class="danger" hidden>Delete selected (0)</button><button id="mapCancelDeleteBtn" type="button" class="secondary" hidden>Cancel</button></div><div class="plan-wrap" id="mapPlanWrap"><div class="plan-placeholder"><b>Select a building and floor</b></div></div><div class="legend"><span><i class="dot" style="background:var(--green)"></i>Working</span><span><i class="dot" style="background:var(--red)"></i>Fault</span><span><i class="dot" style="background:var(--amber)"></i>Not inspected</span><span><i class="dot" style="background:var(--blue)"></i>Under repair</span></div></section>
 <section class="tabpage panel manage-panel" id="adminPage">
   <h2>Admin</h2>
-  <p>Building and floor-plan management. Select a building and floor in Buildings &amp; floor plans first, then use these controls.</p>
-  <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <button id="editBuildingBtn" class="secondary" disabled>Edit building</button>
-    <button id="uploadBtn" class="secondary">Upload floor plan</button>
-    <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+  <p>Manage buildings, floor plans, staff members and emergency light types.</p>
+  <div class="panel" style="padding:16px;margin:14px 0">
+    <h3>Building management</h3>
+    <p>Select and manage the buildings and floors in your register.</p>
+    <aside class="panel side"><div class="section-title">Building management</div><div id="buildingList"></div><button style="width:100%;margin-bottom:8px" id="sideAddBuildingBtn">＋ Add building</button><button class="secondary" style="width:100%" id="addFloorBtn">＋ Add floor to selected building</button><div class="notice">Data is currently saved in this browser on this device. It is not yet synchronised between users or backed up online.</div><div style="margin-top:18px"><div class="section-title">Quick guide</div><div class="muted" style="font-size:13px">1. Add a building and floor plan.<br>2. Choose “Add light”, then tap the plan.<br>3. Select a marker to record an inspection or fault.<br>4. Export your register as a CSV spreadsheet.</div></div></aside>
   </div>
-  <div class="notice" style="margin-top:14px">To manage a different building or floor, return to Buildings &amp; floor plans and select it first.</div>
-</section>
-<section class="tabpage panel manage-panel" id="peoplePage">
+  <div class="panel" style="padding:16px;margin:14px 0">
+    <h3>Selected building and floor</h3>
+    <p>Choose a building and floor in Buildings &amp; floor plans first.</p>
+    <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="editBuildingBtn" class="secondary" disabled>Edit building</button>
+      <button id="uploadBtn" class="secondary">Upload floor plan</button>
+      <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+    </div>
+  </div>
+  <section class="panel manage-panel">
   <h2>People</h2><p>Add the staff members who should appear in the Inspected by dropdown.</p>
   <div class="field" style="display:flex;gap:8px;align-items:end;max-width:650px"><div style="flex:1"><label for="newPersonName">Person's name</label><input id="newPersonName" placeholder="e.g. Alex Smith"></div><button id="addPersonBtn">＋ Add person</button></div>
   <div id="peopleList"></div>
   <div class="notice">Removing a person from this list does not erase their name from existing inspection records.</div>
 </section>
-<section class="tabpage panel manage-panel" id="typesPage">
+  <section class="panel manage-panel">
   <h2>Emergency light types</h2><p>Maintain your own equipment list. These options appear whenever you add or edit a light.</p>
   <div class="field" style="display:flex;gap:8px;align-items:end;max-width:650px"><div style="flex:1"><label for="newTypeName">Light type</label><input id="newTypeName" placeholder="e.g. Recessed emergency downlight"></div><button id="addTypeBtn">＋ Add type</button></div>
   <div id="typesList"></div>
   <div class="notice">Removing a type from this list does not change existing light records already using it.</div>
 </section>
+</section>
+
+
 <div class="modal-back" id="modalBack"><div class="modal"><div id="modalContent"></div></div></div><div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
@@ -138,7 +146,7 @@ function bindMarkerInteractions(container){
  });
 }
 function toast(s){let t=document.getElementById('toast');t.textContent=s;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}function modal(html){document.getElementById('modalContent').innerHTML=html;document.getElementById('modalBack').classList.add('show')}function closeModal(){document.getElementById('modalBack').classList.remove('show')}
-function setTab(name){document.querySelectorAll('.tabbtn').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));document.querySelectorAll('.tabpage').forEach(x=>x.classList.toggle('active',x.id===name+'Page'));if(name==='people')renderPeople();if(name==='types')renderTypes();if(name==='map')renderMapView()}
+function setTab(name){document.querySelectorAll('.tabbtn').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));document.querySelectorAll('.tabpage').forEach(x=>x.classList.toggle('active',x.id===name+'Page'));if(name==='admin'){renderPeople();renderTypes()}if(name==='map')renderMapView()}
 document.querySelectorAll('.tabbtn').forEach(x=>x.onclick=()=>setTab(x.dataset.tab));
 function renderPeople(){let el=document.getElementById('peopleList');el.innerHTML=data.people.length?data.people.map((n,i)=>`<div class="manage-row"><span>${esc(n)}</span><button class="danger" onclick="removePerson(${i})">Remove</button></div>`).join(''):'<div class="empty">No people added yet. Add names above to populate the inspection dropdowns.</div>'}
 function renderTypes(){let el=document.getElementById('typesList');el.innerHTML=data.lightTypes.length?data.lightTypes.map((n,i)=>`<div class="manage-row"><span>${esc(n)}</span><button class="danger" onclick="removeType(${i})">Remove</button></div>`).join(''):'<div class="empty">No types available. Add an equipment type above.</div>'}
