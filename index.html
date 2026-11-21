@@ -20,11 +20,15 @@
  .buildings-hidden-map{display:none!important}
 .app-version-footer{max-width:1400px;margin:18px auto 10px;padding:8px 14px;text-align:center;color:#7b8791;font-size:11px;letter-spacing:.2px}
 
-/* Version 45: align Map and Admin with the Buildings page content inset. */
+/* Version 46: match Map and Admin to the exact Buildings page inset and top gap.
+   These two sections sit just outside .app, so compensate for the app's bottom
+   padding and the tab bar's bottom margin rather than adding another page inset. */
 @media(max-width:850px){
   #mapPage, #adminPage{
-    margin:0 12px !important;
-    padding:16px 10px 0 !important;
+    margin:-3px 0 0 !important;
+    padding:0 22px 0 !important;
+    width:100% !important;
+    max-width:none !important;
     background:transparent !important;
     border:0 !important;
     box-shadow:none !important;
@@ -347,5 +351,5 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
-<footer class="app-version-footer">Version 45</footer>
+<footer class="app-version-footer">Version 46</footer>
 </body></html>
