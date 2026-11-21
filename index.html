@@ -30,7 +30,17 @@
    <button id="cloudSignIn" type="submit" style="width:100%;padding:12px;border:0;border-radius:8px;background:#7a1832;color:#fff;font-weight:700;font-size:15px">Sign in</button>
 
   </form>
-  <p style="font-size:12px;color:#666;margin:14px 0 0">Your existing data on this device will be kept. The first successful sign-in will safely copy it to the shared workspace if the cloud workspace is empty.</p>
+  <form id="invitePasswordForm" style="display:none">
+   <div style="font-size:22px;font-weight:800;margin-bottom:6px">Set your password</div>
+   <p style="margin:0 0 18px;color:#555">Welcome! Create a password for your Millfields Emergency Lighting account.</p>
+   <label for="inviteNewPassword" style="display:block;font-weight:700;margin:10px 0 5px">New password</label>
+   <input id="inviteNewPassword" type="password" autocomplete="new-password" required minlength="8" style="box-sizing:border-box;width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;font:inherit">
+   <label for="inviteConfirmPassword" style="display:block;font-weight:700;margin:12px 0 5px">Confirm password</label>
+   <input id="inviteConfirmPassword" type="password" autocomplete="new-password" required minlength="8" style="box-sizing:border-box;width:100%;padding:12px;border:1px solid #bbb;border-radius:8px;font:inherit">
+   <div id="invitePasswordMessage" role="status" style="font-size:13px;color:#8b1e35;margin:12px 0;min-height:18px"></div>
+   <button id="saveInvitePassword" type="submit" style="width:100%;padding:12px;border:0;border-radius:8px;background:#7a1832;color:#fff;font-weight:700;font-size:15px">Save password and continue</button>
+  </form>
+  <p id="cloudLoginHelp" style="font-size:12px;color:#666;margin:14px 0 0">Your existing data on this device will be kept. The first successful sign-in will safely copy it to the shared workspace if the cloud workspace is empty.</p>
  </div>
 </div>
 <div id="cloudStatus" style="position:fixed;right:10px;bottom:10px;z-index:5000;background:#fff;color:#333;border:1px solid #ddd;border-radius:20px;padding:7px 11px;font-size:11px;box-shadow:0 2px 10px #0002;display:none">Cloud: connecting</div>
@@ -127,6 +137,10 @@ let cloudClient=null,cloudUser=null,cloudReady=false,cloudSaveTimer=null,applyin
 function cloudStatus(message,show=true){const el=document.getElementById('cloudStatus');if(el){el.textContent=message;el.style.display=show?'block':'none'}}
 function showCloudLogin(message=''){const panel=document.getElementById('cloudLogin');if(panel)panel.style.display='flex';const msg=document.getElementById('cloudAuthMessage');if(msg)msg.textContent=message}
 function hideCloudLogin(){const panel=document.getElementById('cloudLogin');if(panel)panel.style.display='none'}
+let invitePasswordFlow=false;
+function hasInviteLink(){try{const params=new URLSearchParams(location.hash.replace(/^#/,'').replace(/^\?/,'').replace(/&amp;/g,'&'));return ['invite','recovery'].includes((params.get('type')||'').toLowerCase())}catch(_){return false}}
+function showInvitePassword(message=''){invitePasswordFlow=true;const login=document.getElementById('cloudAuthForm'),setup=document.getElementById('invitePasswordForm'),help=document.getElementById('cloudLoginHelp');if(login)login.style.display='none';if(setup)setup.style.display='block';if(help)help.style.display='none';const panel=document.getElementById('cloudLogin');if(panel)panel.style.display='flex';const msg=document.getElementById('invitePasswordMessage');if(msg)msg.textContent=message}
+function showNormalCloudLogin(message=''){invitePasswordFlow=false;const login=document.getElementById('cloudAuthForm'),setup=document.getElementById('invitePasswordForm'),help=document.getElementById('cloudLoginHelp');if(login)login.style.display='block';if(setup)setup.style.display='none';if(help)help.style.display='block';showCloudLogin(message)}
 function scheduleCloudSave(){if(!cloudReady||!cloudClient||!cloudUser||applyingCloudData)return;clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(pushCloudData,900)}
 async function pushCloudData(){if(!cloudReady||!cloudClient||!cloudUser||applyingCloudData)return;cloudStatus('Cloud: syncing…');try{const payload={workspace_key:WORKSPACE_KEY,app_data:data};const {error}=await cloudClient.from('app_workspace').upsert(payload,{onConflict:'workspace_key'});if(error)throw error;cloudStatus('Cloud: synced ✓')}catch(error){console.error('Cloud save failed',error);cloudStatus('Cloud: sync problem')}}
 async function startCloudSession(user){cloudUser=user;cloudStatus('Cloud: loading…');try{
@@ -147,11 +161,15 @@ async function startCloudSession(user){cloudUser=user;cloudStatus('Cloud: loadin
  }catch(error){applyingCloudData=false;cloudReady=false;console.error('Cloud connection failed',error);cloudStatus('Cloud: connection problem');showCloudLogin('Could not load the shared workspace: '+(error.message||'Please check your connection and try again.'))}}
 async function initCloud(){try{if(!window.supabase?.createClient){cloudStatus('Cloud: library unavailable');showCloudLogin('Could not load the sign-in service. Please refresh the app.');return}
  cloudClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+ const inviteLink=hasInviteLink();
  const {data:sessionData,error}=await cloudClient.auth.getSession();if(error)throw error;
- if(sessionData.session?.user){hideCloudLogin();await startCloudSession(sessionData.session.user)}else{cloudStatus('Cloud: sign-in required');showCloudLogin()}
- cloudClient.auth.onAuthStateChange((event,session)=>{if(session?.user){hideCloudLogin();if(!cloudReady)startCloudSession(session.user)}else if(event==='SIGNED_OUT'){cloudReady=false;cloudUser=null;cloudStatus('Cloud: signed out');showCloudLogin()}});
+ if(inviteLink&&sessionData.session?.user){showInvitePassword();cloudStatus('Cloud: invitation accepted — set your password')}
+ else if(sessionData.session?.user){hideCloudLogin();await startCloudSession(sessionData.session.user)}
+ else{cloudStatus('Cloud: sign-in required');showCloudLogin()}
+ cloudClient.auth.onAuthStateChange((event,session)=>{if(session?.user){if(invitePasswordFlow||hasInviteLink()){showInvitePassword();return}hideCloudLogin();if(!cloudReady)startCloudSession(session.user)}else if(event==='SIGNED_OUT'){cloudReady=false;cloudUser=null;currentProfile=null;cloudStatus('Cloud: signed out');showNormalCloudLogin()}});
  }catch(error){console.error('Cloud initialisation failed',error);cloudStatus('Cloud: unavailable');showCloudLogin('Unable to connect: '+(error.message||'Please refresh and try again.'))}}
 document.getElementById('cloudAuthForm')?.addEventListener('submit',async event=>{event.preventDefault();if(!cloudClient)return;const email=document.getElementById('cloudEmail').value.trim(),password=document.getElementById('cloudPassword').value;const button=document.getElementById('cloudSignIn');button.disabled=true;button.textContent='Signing in…';document.getElementById('cloudAuthMessage').textContent='';try{const {data:result,error}=await cloudClient.auth.signInWithPassword({email,password});if(error)throw error;if(result.user){hideCloudLogin();await startCloudSession(result.user)}}catch(error){document.getElementById('cloudAuthMessage').textContent=error.message||'Sign-in failed.'}finally{button.disabled=false;button.textContent='Sign in'}});
+document.getElementById('invitePasswordForm')?.addEventListener('submit',async event=>{event.preventDefault();if(!cloudClient)return;const password=document.getElementById('inviteNewPassword').value,confirmPassword=document.getElementById('inviteConfirmPassword').value,msg=document.getElementById('invitePasswordMessage'),btn=document.getElementById('saveInvitePassword');if(password.length<8){msg.textContent='Please use at least 8 characters.';return}if(password!==confirmPassword){msg.textContent='The passwords do not match.';return}btn.disabled=true;btn.textContent='Saving password…';msg.textContent='';try{const {data:updated,error}=await cloudClient.auth.updateUser({password});if(error)throw error;const user=updated?.user||cloudUser;if(!user)throw new Error('Password saved, but your session could not be confirmed. Please sign in.');invitePasswordFlow=false;try{history.replaceState(null,document.title,location.pathname+location.search)}catch(_){}hideCloudLogin();await startCloudSession(user);toast('Password saved. Welcome to the workspace!')}catch(error){msg.textContent=error.message||'Could not save your password. Please reopen the invitation link and try again.'}finally{btn.disabled=false;btn.textContent='Save password and continue'}});
 window.addEventListener('online',()=>{if(cloudReady)scheduleCloudSave()});
 
 // Persist legacy status migration on startup.
