@@ -345,7 +345,70 @@ async function readPhotoFile(file){if(!file.type.startsWith('image/'))throw new 
 window.clearLightPhoto=id=>{let q=findLight(id);if(!q)return;q.l._pendingPhoto=null;q.l._removePhoto=true;document.getElementById('lPhotoArea').innerHTML='<p class="muted" style="font-size:12px">Photo will be removed when you save.</p>'};
 
 window.saveLight=id=>{let q=findLight(id);if(!q)return;let status=document.getElementById('lStatus').value;let inspector=document.getElementById('lInspector').value;if(!status){toast('Please select a status before saving.');const el=document.getElementById('lStatus');el.classList.add('invalid');document.getElementById('lStatusHint').classList.add('validation-hint');el.focus();return}if(!inspector){toast('Please select who inspected this light before saving.');const el=document.getElementById('lInspector');el.classList.add('invalid');document.getElementById('lInspectorHint').classList.add('validation-hint');el.focus();return}let notes=document.getElementById('lNotes').value.trim();if(status==='fault'&&!notes){toast('Please add a comment explaining the fault before saving.');const el=document.getElementById('lNotes');el.classList.add('invalid');el.focus();return}let old=q.l.status;q.l.location=document.getElementById('lLocation').value.trim();q.l.type=document.getElementById('lType').value||'Unspecified';if(status==='fault'){if(old!=='fault'||!Number.isFinite(Number(q.l.faultSince)))q.l.faultSince=Date.now()}else{delete q.l.faultSince}q.l.status=status;q.l.notes=notes;delete q.l.reportedBy;delete q.l.faultReportedBy;delete q.l.reporter;q.l.inspectedBy=inspector;q.l.buildingName=q.b.name;q.l.floorName=q.f.name;if(q.l._pendingPhoto){q.l.photo=q.l._pendingPhoto;delete q.l._pendingPhoto}if(q.l._removePhoto){delete q.l.photo;delete q.l._removePhoto}if(status!==old||notes){q.l.history=q.l.history||[];q.l.history.push({time:Date.now(),result:statusName(status)+(notes?': '+notes:''),inspector})}try{save()}catch(e){toast('Could not save. Storage may be full; try a smaller photo.');return}closeModal();render();toast('Light record saved')};window.deleteLight=id=>{let q=findLight(id);if(!q)return;if(!confirm('Delete '+q.l.ref+' and its inspection history?'))return;q.f.lights=q.f.lights.filter(l=>l.id!==id);save();closeModal();render();toast('Light deleted')};
-function buildRegisterWorkbook(){if(!window.XLSX){toast('Excel export library could not load. Check your internet connection and try again.');return null}let rows=[['Building','Floor','Light ID','Location','Equipment type','Status','Latest notes','Inspection date','Inspected by','Photo attached']];for(let b of data.buildings)for(let f of b.floors)for(let l of f.lights){let h=(l.history||[]).at(-1);rows.push([b.name,f.name,l.ref,l.location,l.type,statusName(l.status),l.notes,h?new Date(h.time).toLocaleString():'',l.inspectedBy||h?.inspector||'',l.photo?'Yes':'No'])}const clean=v=>String(v??'').normalize('NFC').replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g,'');rows=rows.map(r=>r.map(clean));const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map((_,i)=>({wch:Math.min(52,Math.max(12,...rows.map(r=>String(r[i]??'').length+2)))}));ws['!rows']=[{hpt:24},...rows.slice(1).map(()=>({hpt:21}))];ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,rows.length-1),c:rows[0].length-1}})};const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Emergency lighting');return wb}
+function buildRegisterWorkbook(){
+ if(!window.XLSX){toast('Excel export library could not load. Check your internet connection and try again.');return null}
+ const clean=v=>Array.from(String(v??'').normalize('NFC')).filter(ch=>{const c=ch.charCodeAt(0);return !(c<=8||(c>=11&&c<=12)||(c>=14&&c<=31))}).join('');
+ const dateText=t=>{if(t===null||t===undefined||t==='')return '';const d=new Date(t);return Number.isNaN(d.getTime())?'':d.toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})};
+ const headers=['Light ID','Location','Equipment type','Status','Latest notes','Last inspection','Inspected by','Photo attached','Comments / updates','Inspection records','Fault reported'];
+ const wb=XLSX.utils.book_new();
+ const summary=[['MILLFIELDS TRUST – EMERGENCY LIGHTING REGISTER'],['Exported',dateText(Date.now())],[],['Building','Floor','Total lights','Working','Faults','Not inspected']];
+ const usedNames=new Set(['Summary','Inspection history','Comments']);
+ const allHistory=[['Building','Floor','Light ID','Inspection date','Inspection result / notes','Inspector']];
+ const allComments=[['Building','Floor','Light ID','Comment date','Author','Comment']];
+ for(const b of (data.buildings||[])){
+   const floors=b.floors||[];
+   let total=0,working=0,faults=0,notInspected=0;
+   for(const f of floors){
+     const lights=f.lights||[];
+     const count=lights.length, w=lights.filter(l=>l.status==='working').length, fa=lights.filter(l=>l.status==='fault').length, ni=lights.filter(l=>l.status==='not_inspected'||!l.status).length;
+     total+=count;working+=w;faults+=fa;notInspected+=ni;
+     summary.push([clean(b.name),clean(f.name),count,w,fa,ni]);
+   }
+   let base=clean(b.name||'Building').replace(/[\\/*?:[\]]/g,' ').trim().slice(0,25)||'Building';
+   let sheetName=base,n=2;while(usedNames.has(sheetName)){sheetName=(base.slice(0,25)+` ${n++}`).slice(0,31)}usedNames.add(sheetName);
+   const rows=[[clean(b.name||'Building')+' – Emergency lighting register'],['Total lights',total,'Working',working,'Faults',faults,'Not inspected',notInspected],[]];
+   const merges=[{s:{r:0,c:0},e:{r:0,c:headers.length-1}}];
+   for(const f of floors){
+     const floorLights=f.lights||[];
+     const sectionRow=rows.length;rows.push([`FLOOR: ${clean(f.name||'Unnamed floor')}`]);
+     merges.push({s:{r:sectionRow,c:0},e:{r:sectionRow,c:headers.length-1}});
+     rows.push(headers);
+     if(!floorLights.length) rows.push(['No lights recorded on this floor']);
+     for(const l of floorLights){
+       const hist=(l.history||[]).slice().sort((a,b)=>Number(a.time)-Number(b.time));
+       const latest=hist.length?hist[hist.length-1]:null;
+       const comments=(l.comments||[]).slice().sort((a,b)=>Number(a.time)-Number(b.time));
+       const commentText=comments.map(c=>`${dateText(c.time)} – ${clean(c.author||'Unknown')}: ${clean(c.text||'')}`).join('\n');
+       rows.push([clean(l.ref),clean(l.location),clean(l.type),clean(statusName(l.status)),clean(l.notes),latest?dateText(latest.time):'',clean(l.inspectedBy||latest?.inspector||''),l.photo?'Yes':'No',commentText,hist.length,Number.isFinite(Number(l.faultSince))?dateText(l.faultSince):'']);
+       for(const h of hist)allHistory.push([clean(b.name),clean(f.name),clean(l.ref),dateText(h.time),clean(h.result),clean(h.inspector)]);
+       for(const c of comments)allComments.push([clean(b.name),clean(f.name),clean(l.ref),dateText(c.time),clean(c.author||'Unknown user'),clean(c.text)]);
+     }
+     rows.push([]);
+   }
+   const ws=XLSX.utils.aoa_to_sheet(rows);
+   ws['!merges']=merges;
+   ws['!cols']=[{wch:16},{wch:28},{wch:24},{wch:17},{wch:42},{wch:21},{wch:24},{wch:16},{wch:48},{wch:18},{wch:21}];
+   ws['!rows']=rows.map((r,i)=>({hpt:i===0?30:(r.length===1?24:(r===headers?22:21))}));
+   XLSX.utils.book_append_sheet(wb,ws,sheetName);
+ }
+ const sumWs=XLSX.utils.aoa_to_sheet(summary);
+ sumWs['!cols']=[{wch:28},{wch:24},{wch:14},{wch:14},{wch:14},{wch:18}];
+ sumWs['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}];
+ XLSX.utils.book_append_sheet(wb,sumWs,'Summary');
+ const histWs=XLSX.utils.aoa_to_sheet(allHistory);
+ histWs['!cols']=[{wch:26},{wch:22},{wch:16},{wch:22},{wch:52},{wch:24}];
+ if(allHistory.length>1)histWs['!autofilter']={ref:`A1:F${allHistory.length}`};
+ histWs['!freeze']={xSplit:0,ySplit:1};
+ XLSX.utils.book_append_sheet(wb,histWs,'Inspection history');
+ if(allComments.length>1){
+   const commentsWs=XLSX.utils.aoa_to_sheet(allComments);
+   commentsWs['!cols']=[{wch:26},{wch:22},{wch:16},{wch:22},{wch:24},{wch:70}];
+   commentsWs['!autofilter']={ref:`A1:F${allComments.length}`};
+   commentsWs['!freeze']={xSplit:0,ySplit:1};
+   XLSX.utils.book_append_sheet(wb,commentsWs,'Comments');
+ }
+ return wb
+}
 document.getElementById('exportBtn').onclick=()=>{const wb=buildRegisterWorkbook();if(!wb)return;XLSX.writeFile(wb,'emergency-lighting-register.xlsx');toast('Excel spreadsheet exported with fitted column widths')};
 document.getElementById('backupDataBtn').onclick=()=>{try{const payload={app:'Millfields Emergency Lighting Manager',backupVersion:1,createdAt:new Date().toISOString(),storageKey:KEY,data};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='millfields-emergency-lighting-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);toast('Full data backup downloaded. Keep it somewhere safe.')}catch(e){console.error(e);toast('Could not create backup. Please try again.')}};
 document.getElementById('emailExportBtn').onclick=async()=>{const wb=buildRegisterWorkbook();if(!wb)return;const filename='emergency-lighting-register.xlsx';const mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';try{const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'});const file=new File([bytes],filename,{type:mime});if(typeof navigator.share!=='function'){toast('This app/browser cannot send file attachments directly. Export the spreadsheet, then open Downloads, tap Share and choose Outlook.');return}try{await navigator.share({files:[file],title:'Emergency lighting inspection register',text:'Emergency lighting inspection register'});toast('Choose Outlook from the Android share sheet. The Excel file should be attached.')}catch(shareError){if(shareError&&shareError.name==='AbortError')return;console.warn('Android file sharing failed',shareError);toast('Android could not share the attachment. No extra copy was downloaded. Use Export spreadsheet, then share the file from Downloads to Outlook.')}}catch(err){console.error(err);toast('Could not prepare the spreadsheet. Please use Export spreadsheet (Excel) instead.')}}
@@ -361,5 +424,5 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
-<footer class="app-version-footer">Version 48</footer>
+<footer class="app-version-footer">Version 49</footer>
 </body></html>
