@@ -360,7 +360,7 @@ function buildRegisterWorkbook(){
    let total=0,working=0,faults=0,notInspected=0;
    for(const f of floors){
      const lights=f.lights||[];
-     const count=lights.length, w=lights.filter(l=>l.status==='working').length, fa=lights.filter(l=>l.status==='fault').length, ni=lights.filter(l=>l.status==='not_inspected'||!l.status).length;
+     const count=lights.length, w=lights.filter(l=>l.status==='working').length, fa=lights.filter(l=>l.status==='fault').length, ni=lights.filter(l=>l.status==='unchecked').length;
      total+=count;working+=w;faults+=fa;notInspected+=ni;
      summary.push([clean(b.name),clean(f.name),count,w,fa,ni]);
    }
@@ -424,5 +424,5 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
-<footer class="app-version-footer">Version 49</footer>
+<footer class="app-version-footer">Version 50</footer>
 </body></html>
